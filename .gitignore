@@ -1,3 +1,11 @@
+# heavy, sentitive or build files
+*.pdf
+*.docx
+*.xlsx
+*.zip
+*.jsonl
+*.tar.gz
+*.json
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
