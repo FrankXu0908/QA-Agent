@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s   # 每 15 秒收集一次数据
+
+scrape_configs:
+  # 1. 监控 Prometheus 自身
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["prometheus:9090"]
+
+  # 2. 监控 FastAPI
+  - job_name: "rag_api"
+    static_configs:
+      - targets: ["rag_api:8000"]
+
+  # 3. 监控 GPU（需要额外配置 DCGM Exporter, 后面再加）

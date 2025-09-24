@@ -1,6 +1,7 @@
 # rag_pipeline/qa_service.py
 from pathlib import Path
 import sys
+import os
 # 获取当前文件的父目录的父目录（上一级目录）
 parent_dir = Path(__file__).resolve().parent.parent
 # 将上一级目录添加到系统路径
@@ -11,7 +12,7 @@ from vectorstore.query_index import retrieve
 import requests
 
 app = FastAPI()
-LLM_PROXY = "http://127.0.0.1:8001/v1/completions"  # llm_proxy 的地址
+LLM_PROXY = os.getenv("LLM_PROXY", "http://model:8001/v1/completions") # llm_proxy 的地址
 
 class QARequest(BaseModel):
     question: str

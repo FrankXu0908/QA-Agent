@@ -1,0 +1,88 @@
+services:
+  # 1. 模型服务
+  model:
+    image: vllm/vllm-openai:latest
+    # python -m vllm.entrypoints.openai.api_server
+    command: >
+      --model /models/Qwen2.5-32B-Instruct-AWQ
+      --tensor-parallel-size 2
+      --gpu-memory-utilization 0.9
+      --host 0.0.0.0
+      --port 8001
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # important: increase shared memory and ulimits
+    shm_size: 16gb                 # main fix: huge enough for NCCL shared memory
+    tmpfs:
+      - /dev/shm:size=16g          # alternative/extra: mount tmpfs for /dev/shm
+    ulimits:
+      memlock: -1                  # allow locking memory
+      stack: 67108864
+    environment:
+      # - NCCL_DEBUG=INFO
+      # - NCCL_DEBUG_SUBSYS=ALL
+      - NCCL_P2P_DISABLE=1
+      - NCCL_IB_DISABLE=1
+      - NVIDIA_VISIBLE_DEVICES=all
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  # 2. RAG API
+  rag_api:
+    build: 
+      context: .
+      dockerfile: Dockerfile.rag
+    command: uvicorn rag_pipeline.qa_service:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./models/m3e-base-st:/app/models/m3e-base-st
+    ports:
+      - "8000:8000"
+    depends_on:
+      - model
+    environment:
+      - LLM_PROXY=http://model:8001/v1/completions
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  # 3. 前端
+  frontend:
+    build: ./frontend
+    command: streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    depends_on:
+      - rag_api
+
+  # 4. Prometheus
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  # 5. Grafana
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
