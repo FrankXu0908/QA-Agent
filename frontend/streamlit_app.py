@@ -16,9 +16,9 @@ if st.button("问答"):
         resp.raise_for_status()
         data = resp.json()
         st.subheader("模型回复")
-        st.write(data["answer"])
+        st.write(data.get("answer", {}).get("choices",[])[0].get("text", ""))
         st.subheader("检索到的片段（供审阅）")
-        for i, hit in enumerate(data["sources"]):
+        for i, hit in enumerate(data.get("sources", [])):
             st.markdown(f"**片段 {i+1}** (score: {hit['score']:.3f})")
             st.write(hit["meta"].get("text",""))
             st.write("来源:", hit["meta"].get("source","unknown"))

@@ -8,7 +8,6 @@ sys.path.append(str(parent_dir))
 
 from ingestion.embedder import Embedder
 from vectorstore.build_index import search
-import numpy as np
 
 embedder = Embedder()
 

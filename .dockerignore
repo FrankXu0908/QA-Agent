@@ -1,0 +1,10 @@
+# Ignore models (big files) by default
+models/
+
+# Git & cache
+.git/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
