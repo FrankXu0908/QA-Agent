@@ -8,6 +8,7 @@
 *.json
 *.index
 models/*
+*/models/
 *.whl
 # Byte-compiled / optimized / DLL files
 __pycache__/
