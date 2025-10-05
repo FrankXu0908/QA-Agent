@@ -8,6 +8,7 @@
 *.json
 *.index
 models/*
+*.whl
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

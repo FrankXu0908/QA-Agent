@@ -10,8 +10,9 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from vectorstore.query_index import retrieve
 import requests
+from contextlib import asynccontextmanager
+from prometheus_fastapi_instrumentator import Instrumentator
 
-app = FastAPI()
 LLM_PROXY = os.getenv("LLM_PROXY", "http://model:8001/v1/completions") # llm_proxy 的地址
 
 class QARequest(BaseModel):
@@ -28,6 +29,19 @@ def build_prompt(question: str, contexts: list):
 用户问题: {question}
 请用简体中文回答，回答中不要编造事实，如不确定请标注“不确定”。"""
     return prompt
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 启动时执行
+    print("✅ Prometheus metrics 已经启用 /metrics")
+    yield
+    # 关闭时执行
+    print("🛑 FastAPI 正在关闭")
+
+# 初始化 FastAPI，传入 lifespan
+app = FastAPI(lifespan=lifespan)
+# ✅ 在实例化 app 后立即注册指标
+Instrumentator().instrument(app).expose(app)
 
 @app.post("/qa")
 def qa(req: QARequest):
@@ -55,3 +69,4 @@ def qa(req: QARequest):
         import traceback
         traceback.print_exc()
         return {"error": str(e)}
+
