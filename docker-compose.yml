@@ -61,10 +61,16 @@ services:
 
   # 3. 前端
   frontend:
-    build: ./frontend
-    command: streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0
+    build: 
+      context: .
+      dockerfile: Dockerfile.frontend
+    command: streamlit run frontend/streamlit_app.py --server.port 8501 --server.address 0.0.0.0
+    volumes:
+      - ./frontend:/app/frontend
     ports:
       - "8501:8501"
+    environment:
+      - QA_API=http://rag_api:8000/qa
     depends_on:
       - rag_api
 
@@ -74,15 +80,21 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
-      - "9090:9090"
+      - "9091:9090"
 
   # 5. Grafana
   grafana:
-    image: grafana/grafana
+    image: grafana/grafana:latest
+    container_name: grafana
     ports:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
     depends_on:
       - prometheus
+
+volumes:
+  grafana-data:

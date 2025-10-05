@@ -1,8 +1,9 @@
 # frontend/streamlit_app.py
+import os
 import streamlit as st
 import requests
 
-QA_API = "http://127.0.0.1:8000/qa"  # rag_pipeline 服务地址
+QA_API = os.getenv("QA_API", "http://localhost:8000/qa")  # rag_pipeline 服务地址
 
 st.set_page_config(page_title="质量文档 QA", layout="wide")
 st.title("质量文档问答（FMEA / PPAP） — Phase1")
