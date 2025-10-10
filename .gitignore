@@ -1,5 +1,6 @@
 # heavy, sentitive or build files
 *.pdf
+*.doc
 *.docx
 *.xlsx
 *.zip
@@ -7,9 +8,15 @@
 *.tar.gz
 *.json
 *.index
+*.sqlite
 models/*
 */models/
 *.whl
+data/raw/
+data/processed/
+vectorstore/faiss.index
+vectorstore/metadatas.jsonl
+tests/*.ipynb
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
