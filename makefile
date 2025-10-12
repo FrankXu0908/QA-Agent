@@ -8,3 +8,9 @@ logs:
 
 down:
 	docker compose down
+
+test:
+	pytest -q
+
+smoke:
+	pytest -q tests/smoke

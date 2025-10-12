@@ -1,25 +1,37 @@
 # vectorstore/query_index.py
-from pathlib import Path
-import sys
-# 获取当前文件的父目录的父目录（上一级目录）
-parent_dir = Path(__file__).resolve().parent.parent
-# 将上一级目录添加到系统路径
-sys.path.append(str(parent_dir))
+"""Convenience helper for running ad-hoc searches against the vector store service."""
 
+from clients.vectorstore_client import VectorStoreClient
+from core.config import get_settings
+from core.models import SearchQuery
 from ingestion.embedder import Embedder
-from vectorstore.build_index import search
 
 embedder = Embedder()
+vector_client = VectorStoreClient()
+settings = get_settings()
 
-def retrieve(text: str, topk=5):
-    emb = embedder.encode([text])
-    return search(emb, topk=topk)[0]  # 返回 hits 列表
+
+def retrieve(text: str, topk: int = 5):
+    embedding = embedder.encode([text])[0].tolist()
+    query = SearchQuery(
+        namespace=settings.vectorstore_default_namespace,
+        query_embedding=embedding,
+        top_k=topk,
+    )
+    resp = vector_client.search(query)
+    return [hit.model_dump() for hit in resp.hits]
+
 
 def test():
     query = "项目领料流程是怎样的？"
     results = retrieve(query, topk=3)
     for r in results:
-        print(f"Score: {r['score']:.4f}, Source: {r['meta']['source']}, Text: {r['meta']['text'][:50]}...")
-        
+        metadata = r.get("metadata", {})
+        print(
+            f"Score: {r.get('score', 0):.4f}, Source: {metadata.get('source')}, "
+            f"Text: {metadata.get('text', '')[:50]}..."
+        )
+
+
 if __name__ == "__main__":
     test()

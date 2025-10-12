@@ -1,0 +1,19 @@
+# 使用官方的 Python 镜像作为基础
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip setuptools wheel
+
+COPY services/vectorstore_api/requirements.txt ./requirements.txt
+
+RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+COPY . .
+
+EXPOSE 8082
+
+RUN useradd -m -u 1001 storeuser && chown -R storeuser:storeuser /app
+USER storeuser
+
+CMD ["uvicorn", "services.vectorstore_api.app:app", "--host", "0.0.0.0", "--port", "8082"]

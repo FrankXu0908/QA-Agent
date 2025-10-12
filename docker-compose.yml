@@ -39,27 +39,121 @@ services:
         max-size: "100m"
         max-file: "3"
 
-  # 2. RAG API
+  # 2. Milvus Vector Database dependencies
+  milvus-etcd:
+    image: quay.io/coreos/etcd:v3.5.18
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    command: >
+      etcd
+      -advertise-client-urls http://milvus-etcd:2379
+      -listen-client-urls http://0.0.0.0:2379
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    volumes:
+      - ./storage/etcd:/etcd
+    restart: unless-stopped
+    networks: [storage]
+
+  milvus-minio:
+    image: minio/minio:latest
+    command: minio server /minio_data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - ./storage/minio:/minio_data
+    restart: unless-stopped
+    networks: [storage]
+
+  milvus:
+    image: milvusdb/milvus:v2.6.3
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: milvus-etcd:2379
+      MINIO_ADDRESS: milvus-minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MQ_TYPE: woodpecker
+    depends_on:
+      milvus-etcd:
+        condition: service_healthy
+      milvus-minio:
+        condition: service_healthy
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    volumes:
+      - ./storage/milvus:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+    networks: [storage]
+
+  # 3. Vector Store API
+  vectorstore:
+    build:
+      context: .
+      dockerfile: Dockerfile.vectorstore
+    ports:
+      - "8082:8082"
+    depends_on:
+        milvus:
+          condition: service_healthy
+    environment:
+      - QA_AGENT_MILVUS_HOST=milvus
+      - QA_AGENT_MILVUS_PORT=19530
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+    restart: unless-stopped
+    networks: [storage]
+
+  # 4. RAG API
   rag_api:
     build: 
       context: .
       dockerfile: Dockerfile.rag
-    command: uvicorn rag_pipeline.qa_service:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn services.rag_api.app:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./models/m3e-base-st:/app/models/m3e-base-st
     ports:
       - "8000:8000"
     depends_on:
       - model
+      - vectorstore
     environment:
       - LLM_PROXY=http://model:8001/v1/completions
+      - QA_AGENT_VECTORSTORE_DEFAULT_NAMESPACE=kb_default
+      - QA_AGENT_LLM_PROXY_URL=http://model:8001/v1/completions
+      - QA_AGENT_VECTORSTORE_API_URL=http://vectorstore:8082
     logging:
       driver: "json-file"
       options:
         max-size: "100m"
         max-file: "3"
 
-  # 3. 前端
+  # 5. 前端
   frontend:
     build: 
       context: .
@@ -74,7 +168,7 @@ services:
     depends_on:
       - rag_api
 
-  # 4. Prometheus
+  # 6. Prometheus
   prometheus:
     image: prom/prometheus
     volumes:
@@ -82,7 +176,7 @@ services:
     ports:
       - "9091:9090"
 
-  # 5. Grafana
+  # 7. Grafana
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -98,3 +192,8 @@ services:
 
 volumes:
   grafana-data:
+
+networks:
+  storage:
+    driver: bridge
+

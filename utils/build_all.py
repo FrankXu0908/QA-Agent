@@ -1,45 +1,74 @@
 # utils/build_all.py
-import json, os, sys
+import sys
+import json
+import os
 from pathlib import Path
-# 获取当前文件的父目录的父目录（上一级目录）
-parent_dir = Path(__file__).resolve().parent.parent
-# 将上一级目录添加到系统路径
-sys.path.append(str(parent_dir))
+from typing import List
+# 添加项目根目录到 Python 路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)  # 获取项目根目录
+sys.path.insert(0, project_root)
 
-from ingestion.parser import parse_file
-from ingestion.cleaner import clean_text
+from clients.vectorstore_client import VectorStoreClient
+from core.config import get_settings
+from core.models import VectorRecord
 from ingestion.chunker import split_by_size
+from ingestion.cleaner import clean_text
 from ingestion.embedder import Embedder
-from vectorstore.build_index import build_index
+from ingestion.parser import parse_file
+from ingestion.vector_writer import build_record, write_upserts
 
 
+settings = get_settings()
 
-DATA_RAW = "data/raw/现场流程相关文件"
-OUT = "data/processed"
-os.makedirs(OUT, exist_ok=True)
+DATA_RAW = Path("data/raw")
+OUT = Path("data/processed")
+OUT.mkdir(parents=True, exist_ok=True)
 
 embedder = Embedder()
+vector_client = VectorStoreClient(base_url="http://localhost:8082")
 
-metadatas = []
-texts = []
-for p in os.listdir(DATA_RAW):
-    path = os.path.join(DATA_RAW, p)
-    txt = parse_file(path)
-    txt = clean_text(txt)
-    chunks = split_by_size(txt, max_chars=800)
-    for i, ch in enumerate(chunks):
-        meta = {"id": f"{p}__{i}",
-                "source": p, 
-                "text": ch}
-        metadatas.append(meta)
-        texts.append(ch)
-        with open(os.path.join(OUT, f"{meta['id']}.json"), "w", encoding="utf-8") as f:
-            json.dump(meta, f, ensure_ascii=False, indent=2)
-            f.write("\n")
 
-# 生成 embeddings（批量）
-embs = embedder.encode(texts)  # numpy array
-dim = embs.shape[1]
-# build faiss index
-build_index(embs, metadatas, dim)
-print("构建完成")
+def build_records(namespace: str, embeddings, metadatas: List[dict]) -> List[VectorRecord]:
+    """Build VectorRecord entries from precomputed embeddings."""
+    vector_client.ensure_namespace(namespace, embeddings.shape[1])
+    records = []
+    for emb, meta in zip(embeddings, metadatas):
+        record_id = meta.get("doc_id")
+        if not record_id:
+            raise ValueError("metadata must include 'doc_id'")
+        records.append(build_record(record_id, namespace, emb.tolist(), meta))
+    return records
+
+
+def main(namespace: str = settings.vectorstore_default_namespace):
+    metadatas: List[dict] = []
+    texts: List[str] = []
+
+    for path in DATA_RAW.glob("**/*"):
+        if not path.is_file():
+            continue
+        txt = parse_file(str(path))
+        txt = clean_text(txt)
+        chunks = split_by_size(txt, max_chars=800)
+        for idx, chunk in enumerate(chunks):
+            chunk_id = f"{path.stem}__{idx}"
+            meta = {"doc_id": chunk_id, "source": str(path), "text": chunk}
+            metadatas.append(meta)
+            texts.append(chunk)
+            with open(OUT / f"{chunk_id}.json", "w", encoding="utf-8") as fh:
+                json.dump(meta, fh, ensure_ascii=False, indent=2)
+                fh.write("\n")
+
+    if not texts:
+        print("No documents found; skipping ingestion.")
+        return
+
+    embeddings = embedder.encode(texts)
+    records = build_records(namespace, embeddings, metadatas)
+    write_upserts(records)
+    print(f"Ingestion complete for namespace '{namespace}' with {len(records)} records.")
+
+
+if __name__ == "__main__":
+    main()#namespace = "qa"

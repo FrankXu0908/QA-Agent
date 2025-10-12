@@ -1,40 +1,71 @@
-# ingestion/parser.py
-import pdfplumber
-from docx import Document
+"""Document parsing utilities without heavy textract dependency."""
+
+from __future__ import annotations
+
+import subprocess
 from pathlib import Path
-import textract
 
 
 def parse_pdf(path: str) -> str:
-    text = []
-    with pdfplumber.open(path) as pdf:
-        for page in pdf.pages:
-            text.append(page.extract_text() or "")
-    return "\n".join(text)
+    try:
+        import pymupdf  # type: ignore
+    except ImportError:  # pragma: no cover
+        try:
+            from pypdf import PdfReader  # type: ignore
+        except ImportError:
+            raise RuntimeError(
+                "pdf parsing requires pymupdf or pypdf; install one of them."
+            )
+        reader = PdfReader(path)
+        return "\n".join(page.extract_text() or "" for page in reader.pages)
+
+    doc = pymupdf.open(path)
+    try:
+        return "\n".join(page.get_text("text") for page in doc)
+    finally:
+        doc.close()
+
 
 def parse_docx(path: str) -> str:
+    from docx import Document  # type: ignore
+
     doc = Document(path)
     return "\n".join(p.text for p in doc.paragraphs)
 
+
 def parse_doc(path: str) -> str:
+    # Prefer pypandoc for legacy doc files
     try:
-        # 使用 textract 解析 .doc 文件
-        text = textract.process(path).decode('utf-8')
-        return text
-    except Exception as e:
-        print(f"无法解析 .doc 文件 {path}: {e}")
-        return ""
+        import pypandoc  # type: ignore
+
+        return pypandoc.convert_file(path, "plain")
+    except (ImportError, OSError):
+        pass
+
+    # Fall back to unoconv if available
+    try:
+        result = subprocess.run(
+            ["unoconv", "-f", "txt", path],
+            check=True,
+            capture_output=True,
+        )
+        return result.stdout.decode("utf-8")
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        raise RuntimeError(
+            "Unable to parse .doc file; install pypandoc or unoconv with LibreOffice."
+        )
+
 
 def parse_file(path: str) -> str:
     p = Path(path)
-    if p.suffix.lower() == ".pdf":
+    suffix = p.suffix.lower()
+    if suffix == ".pdf":
         return parse_pdf(str(p))
-    elif p.suffix.lower() == ".docx":
+    if suffix == ".docx":
         return parse_docx(str(p))
-    elif p.suffix.lower() == ".doc":
-        return parse_doc(str(p))        
-    else:
-        return p.read_text(encoding="utf-8", errors="ignore")
+    if suffix == ".doc":
+        return parse_doc(str(p))
+    return p.read_text(encoding="utf-8", errors="ignore")
 
 def main():
     DATA_RAW = "data/raw/现场流程相关文件"
