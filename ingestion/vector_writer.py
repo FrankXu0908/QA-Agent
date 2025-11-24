@@ -9,7 +9,14 @@ from core.config import get_settings
 from core.models import VectorMetadata, VectorRecord
 
 settings = get_settings()
-vector_client = VectorStoreClient()
+_vector_client: VectorStoreClient | None = None
+
+
+def _get_client() -> VectorStoreClient:
+    global _vector_client
+    if _vector_client is None:
+        _vector_client = VectorStoreClient()
+    return _vector_client
 
 
 def build_record(
@@ -25,9 +32,9 @@ def build_record(
 
 def write_upserts(records: Iterable[VectorRecord]) -> None:
     """Send upsert request to the vector store."""
-    vector_client.upsert(records)
+    _get_client().upsert(records)
 
 
 def write_deletes(namespace: str, ids: List[str]) -> None:
     """Delete records from the vector store."""
-    vector_client.delete(namespace, ids)
+    _get_client().delete(namespace, ids)

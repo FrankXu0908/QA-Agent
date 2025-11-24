@@ -1,6 +1,5 @@
 # ingestion/chunker.py
 from typing import List
-import jieba
 
 def split_by_size(text: str, max_chars: int = 800) -> List[str]:
     # 尽量按段落/句子切分，保证语义完整

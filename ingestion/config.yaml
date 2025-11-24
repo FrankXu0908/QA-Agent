@@ -1,0 +1,14 @@
+manifest:
+  path: data/manifest.csv
+  checkpoint_db: data/checkpoints.sqlite
+  input_root: data/raw        # 你的原始文件根目录
+  # include_globs: ["**/*.pdf", "**/*.docx", "**/*.txt"]
+  exclude_globs: ["**/~$*","**/*.gitkeep"]          # 临时文件之类，可选
+
+vectorstore:
+  namespace: kb_default
+  batch_size: 512
+  chunk_size: 800
+
+siglip:
+  model_name: ../models/siglip

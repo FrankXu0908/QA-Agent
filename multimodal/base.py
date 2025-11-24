@@ -13,6 +13,7 @@ class Modality(str, Enum):
     IMAGE = "image"
     AUDIO = "audio"
     VIDEO = "video"
+    TABULAR = "tabular"
 
 
 class MultimodalRequest(BaseModel):

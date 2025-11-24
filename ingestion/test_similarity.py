@@ -42,6 +42,13 @@ DISSIMILAR_PAIRS = [
 ]
 
 
+# Image-text pairs for similarity testing
+IMAGE_TEXT_PAIRS = [
+    ("tests/data/apple.jpg", "苹果是一种水果"),
+    ("tests/data/sunny.jpg", "今天天气很好"),
+]
+
+
 @pytest.fixture(scope="module")
 def embedder():
     return Embedder()
@@ -59,3 +66,26 @@ def test_dissimilar_pairs(embedder, text1, text2):
     embeddings = embedder.encode([text1, text2])
     similarity = cosine_similarity(embeddings[0].reshape(1, -1), embeddings[1].reshape(1, -1))[0][0]
     assert similarity < 0.5
+
+
+# Test image-text similarity
+import pytest
+
+@pytest.mark.parametrize("image_path,text", IMAGE_TEXT_PAIRS)
+def test_image_text_similarity(embedder, image_path, text):
+    # Load image
+    from PIL import Image
+    img = Image.open(image_path).convert("RGB")
+
+    # Encode: embedder.encode should accept a list of payloads;
+    # here we pass one image and one text.
+    embeddings = embedder.encode([img, text])
+
+    img_emb, text_emb = embeddings
+
+    similarity = cosine_similarity(
+        img_emb.reshape(1, -1),
+        text_emb.reshape(1, -1)
+    )[0][0]
+
+    assert similarity > 0.3
