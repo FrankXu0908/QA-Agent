@@ -13,11 +13,12 @@
 models/*
 */models/
 *.whl
-data/raw/
-data/processed/
+ingestion/data/raw/
+ingestion/data/processed/
 vectorstore/faiss.index
 vectorstore/metadatas.jsonl
 tests/*.ipynb
+volumes/
 storage/
 storage/milvus/
 tests/*.py
