@@ -13,14 +13,13 @@
 models/*
 */models/
 *.whl
-ingestion/data/raw/
-ingestion/data/processed/
+ingestion/data/*
+!ingestion/data/.gitkeep
+!ingestion/data/examples/*
 vectorstore/faiss.index
 vectorstore/metadatas.jsonl
 tests/*.ipynb
 volumes/
-storage/
-storage/milvus/
 tests/*.py
 */.DS_Store
 # Byte-compiled / optimized / DLL files

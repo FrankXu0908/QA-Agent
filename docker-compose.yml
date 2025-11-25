@@ -57,7 +57,7 @@ services:
       timeout: 20s
       retries: 3
     volumes:
-      - ./storage/etcd:/etcd
+      - ./ingestion/data/milvus/etcd:/etcd
     restart: unless-stopped
     networks: [storage]
 
@@ -76,7 +76,7 @@ services:
       timeout: 3s
       retries: 20
     volumes:
-      - ./storage/minio:/minio_data
+      - ./ingestion/data/milvus/minio:/minio_data
     restart: unless-stopped
     networks: [storage]
 
@@ -98,7 +98,7 @@ services:
       - "19530:19530"
       - "9091:9091"
     volumes:
-      - ./storage/milvus:/var/lib/milvus
+      - ./ingestion/data/milvus/milvus:/var/lib/milvus
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
       interval: 30s
